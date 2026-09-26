@@ -130,56 +130,6 @@ jobs:
           sed -i "s|^kernel.string=.*|kernel.string=Rodin ${KERNEL_RELEASE} (ReSukiSU)|" AnyKernel3/anykernel.sh
           # 不再打包外层 zip：artifact 下载下来本身就是可刷的 AK3 zip
 
-      - name: Fetch matching ReSukiSU manager APKs
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          # sync-resukisu 落地时固定在 drivers/kernelsu/Kbuild 里的 ReSukiSU commit
-          RSU_SHA=$(grep -E '^KSU_COMMIT_SHA[[:space:]]*:= *[0-9a-f]{8}[[:space:]]*$' drivers/kernelsu/Kbuild | head -n1 | awk '{print $3}')
-          echo "landed ReSukiSU commit: ${RSU_SHA:-<none>}"
-          mkdir -p manager-apk
-
-          fetch_apks() { # $1 = ReSukiSU CI run id
-            rm -rf manager-apk && mkdir -p manager-apk
-            for name in Manager-release Spoofed-Manager-release; do
-              local art
-              art=$(gh api "repos/$RSU_REPO/actions/runs/$1/artifacts?per_page=100" \
-                    --jq ".artifacts[] | select(.name==\"$name\" and .expired==false) | .id" | head -n1)
-              [ -n "$art" ] || return 1
-              gh api "repos/$RSU_REPO/actions/artifacts/$art/zip" > "$name.zip"
-              unzip -oq "$name.zip" -d manager-apk
-            done
-            # 只保留 arm64-v8a 变体并按变种分目录（剔除 universal / armeabi-v7a / x86_64）
-            find manager-apk -type f -name '*.apk' ! -name '*arm64-v8a*' -delete
-            rm -rf manager manager-spoofed
-            mkdir -p manager manager-spoofed
-            find manager-apk -type f -name '*arm64-v8a-release.apk' ! -name '*spoofed*' -exec mv {} manager/ \;
-            find manager-apk -type f -name '*arm64-v8a-release.apk' -name '*spoofed*' -exec mv {} manager-spoofed/ \;
-            local n
-            n=$(find manager manager-spoofed -type f -name '*.apk' | wc -l)
-            [ "$n" -ge 2 ] || { echo "::error::expected 2 arm64-v8a manager APKs (release + spoofed), got $n"; return 1; }
-          }
-
-          RUN_ID=""
-          if [ -n "$RSU_SHA" ]; then
-            for cand in $(gh api "repos/$RSU_REPO/actions/workflows/build-manager.yml/runs?branch=main&status=success&per_page=100" \
-                          --jq ".workflow_runs[] | select(.head_sha | startswith(\"$RSU_SHA\")) | .id"); do
-              echo "trying run $cand (matches landed ReSukiSU commit)"
-              RUN_ID="$cand"; fetch_apks "$cand" && break || RUN_ID=""
-            done
-          fi
-          if [ -z "$RUN_ID" ]; then
-            echo "::warning::no artifacts for ReSukiSU commit ${RSU_SHA:-unknown} - falling back to latest successful main build"
-            for cand in $(gh api "repos/$RSU_REPO/actions/workflows/build-manager.yml/runs?branch=main&status=success&per_page=10" --jq '.workflow_runs[].id'); do
-              echo "trying latest run $cand"
-              RUN_ID="$cand"; fetch_apks "$cand" && break || RUN_ID=""
-            done
-          fi
-          [ -n "$RUN_ID" ] || { echo "::error::no usable ReSukiSU Build Manager artifacts found"; exit 1; }
-          echo "RSU_RUN_URL=https://github.com/$RSU_REPO/actions/runs/$RUN_ID" >> "$GITHUB_ENV"
-          ls -la manager manager-spoofed
-
       - name: Upload AnyKernel3 flashable zip
         uses: actions/upload-artifact@v4
         with:
