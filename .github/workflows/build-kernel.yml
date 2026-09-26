@@ -139,19 +139,7 @@ jobs:
           path: AnyKernel3/**
           if-no-files-found: error
 
-      - name: Upload ReSukiSU manager APK (release, arm64-v8a)
-        uses: actions/upload-artifact@v4
-        with:
-          name: rodin-${{ env.KERNEL_RELEASE }}-manager
-          path: manager/*.apk
-          if-no-files-found: error
 
-      - name: Upload ReSukiSU manager APK (spoofed, arm64-v8a)
-        uses: actions/upload-artifact@v4
-        with:
-          name: rodin-${{ env.KERNEL_RELEASE }}-manager-spoofed
-          path: manager-spoofed/*.apk
-          if-no-files-found: error
 
       - name: Build summary
         run: |
