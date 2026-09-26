@@ -2,7 +2,7 @@
 VERSION = 6
 PATCHLEVEL = 6
 SUBLEVEL = 143
-EXTRAVERSION =
+EXTRAVERSION = -xiaoxiapower
 NAME = Pinguïn Aangedreven
 
 # *DOCUMENTATION*
